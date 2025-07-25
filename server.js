@@ -20,8 +20,8 @@ app.post('/api/analyze', async (req, res) => {
         const domain = new URL(url).hostname;
 
         // --- שלב 1: חיפוש אמיתי בגוגל כדי למצוא את דף התיעוד ---
-        const googleApiKey = process.env.Google_SEARCH_API_KEY;
-        const searchEngineId = process.env.Google_SEARCH_ENGINE_ID;
+        const googleApiKey = process.env.GOOGLE_SEARCH_API_KEY;
+        const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
         const searchQuery = `${domain} API documentation developer`;
 
         if (!googleApiKey || !searchEngineId) {
