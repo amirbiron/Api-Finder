@@ -11,103 +11,132 @@ app.use(express.static('public'));
 
 app.post('/api/analyze', async (req, res) => {
     try {
-        const { url, websiteContent } = req.body;
-        
+        const { url } = req.body;
+
         if (!url) {
             return res.status(400).json({ error: 'URL נדרש' });
         }
 
         const domain = new URL(url).hostname;
 
-        // fetch זמין ב-Node.js 18+
+        // --- שלב 1: חיפוש אמיתי בגוגל כדי למצוא את דף התיעוד ---
+        const googleApiKey = process.env.Google_SEARCH_API_KEY;
+        const searchEngineId = process.env.Google_SEARCH_ENGINE_ID;
+        const searchQuery = `${domain} API documentation developer`;
 
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-api-key": process.env.ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01"
-            },
-            body: JSON.stringify({
-                model: "claude-3-5-sonnet-20241022",
-                max_tokens: 1500,
-                messages: [
-                    {
-                        role: "user",
-                        content: `אתה מומחה לזיהוי APIs. נתח את האתר ${url} (domain: ${domain}).
+        if (!googleApiKey || !searchEngineId) {
+            throw new Error('\u05de\u05e4\u05ea\u05d7 \u05d4-API \u05e9\u05dc \u05d2\u05d5\u05d2\u05dc \u05d0\u05d5 \u05de\u05d6\u05d4\u05d4 \u05de\u05e0\u05d5\u05e2 \u05d4\u05d7\u05d9\u05e4\u05d5\u05e9 \u05d0\u05d9\u05e0\u05dd \u05de\u05d5\u05d2\u05d3\u05e8\u05d9\u05dd \u05d1\u05e9\u05e8\u05ea.');
+        }
 
-${websiteContent ? `תוכן מהאתר: ${websiteContent}` : ''}
+        const googleSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${googleApiKey}&cx=${searchEngineId}&q=${encodeURIComponent(searchQuery)}`;
 
-בהתבסס על הדומיין, שם החברה, והתוכן - צור ניתוח של ה-API האפשרי.
+        let documentationURL = '';
+        let searchResultsText = '';
 
-אני רוצה שתחזיר JSON בפורמט הזה בלבד:
+        try {
+            const searchResponse = await fetch(googleSearchUrl);
+            if (searchResponse.ok) {
+                const searchData = await searchResponse.json();
+                if (searchData.items && searchData.items.length > 0) {
+                    // \u05e7\u05d7 \u05d0\u05ea \u05d4\u05ea\u05d5\u05e6\u05d0 \u05d4\u05e8\u05d0\u05e9\u05d5\u05e0\u05d9\u05ea \u05d1\u05d9\u05d5\u05ea\u05e8
+                    documentationURL = searchData.items[0].link;
+                    // \u05d0\u05d9\u05e1\u05d5\u05e3 \u05ea\u05d9\u05d0\u05d5\u05e8\u05d9\u05dd (snippets) \u05de\u05d4\u05ea\u05d5\u05e6\u05d0\u05d5\u05ea \u05d4\u05e8\u05d0\u05e9\u05d5\u05e0\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05ea\u05ea \u05dc\u05e7\u05dc\u05d5\u05d3 \u05d9\u05d5\u05ea\u05e8 \u05d4\u05e7\u05e9\u05e8
+                    searchResultsText = searchData.items.slice(0, 3).map(item => item.snippet).join('\n');
+                }
+            }
+        } catch (searchError) {
+            console.error('\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05d7\u05d9\u05e4\u05d5\u05e9 \u05d1\u05d2\u05d5\u05d2\u05dc, \u05de\u05de\u05e9\u05d9\u05da \u05d1\u05dc\u05e2\u05d3\u05d9\u05d5: ', searchError);
+            // \u05d0\u05dd \u05d4\u05d7\u05d9\u05e4\u05d5\u05e9 \u05e0\u05db\u05e9\u05dc, \u05e0\u05de\u05e9\u05d9\u05da \u05d4\u05d0\u05dc\u05d4 \u05d5\u05e0\u05e2\u05de\u05d3 \u05e2\u05dc \u05d4\u05d9\u05d3\u05e2 \u05e9\u05dc \u05e7\u05dc\u05d5\u05d3
+        }
 
+
+        // --- שלב 2: שליחת המידע האמיתי לקלוד לניתוח ---
+        const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+        if (!anthropicApiKey) {
+            throw new Error('\u05de\u05e4\u05ea\u05d7 \u05d4-API \u05e9\u05dc Anthropic \u05d0\u05d9\u05e0\u05d5 \u05de\u05d5\u05d2\u05d3\u05e8 \u05d1\u05e9\u05e8\u05ea.');
+        }
+        
+        // \u05d1\u05e0\u05d9\u05d9\u05ea \u05d4\u05e0\u05d7\u05d9\u05d4 \u05d4\u05d7\u05d3\u05e9 \u05d5\u05d7\u05dbמ\u05d4 \u05d9ותר \u05dcק\u05dcוד
+        const userPrompt = `You are an expert API analyst. Analyze the service at the domain "${domain}".
+I have performed a real Google search to find its API documentation.
+
+The most likely documentation URL I found is: ${documentationURL || "Not found."}
+Here are some relevant snippets from the search results:
+"${searchResultsText || "No snippets found."}"
+
+Based on this REAL information, and your general knowledge, please fill in the following JSON structure.
+- If you find a real Base URL or documentation link, use it.
+- Prioritize information from the snippets.
+- If you cannot find specific information, use the string "לא נמצא מידע". Do not invent false information.
+- Provide the real service name.
+
+Return ONLY the valid JSON object, with no other text or explanations.
+
+JSON format:
 {
   "serviceName": "שם השירות בעברית",
   "hasAPI": true,
   "apiType": "REST",
   "baseURL": "https://api.${domain}",
-  "documentationURL": "https://${domain}/docs",
+  "documentationURL": "${documentationURL || `https://${domain}/docs`}",
   "requiresAuth": true,
   "authType": "API Key",
   "keyEndpoints": ["/api/v1/data", "/api/v1/users"],
   "description": "תיאור קצר של השירות בעברית",
   "exampleRequest": "curl -H 'Authorization: Bearer TOKEN' https://api.${domain}/api/v1/data",
-  "sdkAvailable": true,
-  "rateLimits": "1000 בקשות לשעה",
-  "pricingModel": "freemium",
-  "sources": ["${domain}"]
-}
+  "sdkAvailable": false,
+  "rateLimits": "לא נמצא מידע",
+  "pricingModel": "לא נמצא מידע",
+  "sources": ["${documentationURL || domain}"]
+}`;
 
-התבסס על ידע כללי ועל הדומיין. החזר רק JSON תקין ללא הסברים.`
-                    }
-                ]
+        const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-key": anthropicApiKey,
+                "anthropic-version": "2023-06-01"
+            },
+            body: JSON.stringify({
+                model: "claude-3-sonnet-20240229",
+                max_tokens: 2048,
+                messages: [{ role: "user", content: userPrompt }]
             })
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Anthropic API error:', response.status, errorText);
-            throw new Error(`Anthropic API error: ${response.status}`);
+        if (!anthropicResponse.ok) {
+            const errorText = await anthropicResponse.text();
+            console.error('Anthropic API error:', anthropicResponse.status, errorText);
+            throw new Error(`Anthropic API error: ${anthropicResponse.status}`);
         }
 
-        const data = await response.json();
+        const data = await anthropicResponse.json();
         let apiInfo = data.content[0].text;
         
-        // ניקוי JSON
-        apiInfo = apiInfo.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        // \u05e0\u05d9\u05e7\u05d5\u05d9 JSON
+        apiInfo = apiInfo.replace(/\`\`\`json\s*/g, '').replace(/\`\`\`\s*/g, '').trim();
         
         try {
             const parsedResult = JSON.parse(apiInfo);
+            // \u05d4\u05d5\u05e1\u05e4\u05ea \u05d4\u05de\u05e7\u05d5\u05e8 \u05d4\u05d0\u05de\u05d9\u05ea \u05d0\u05dd \u05e0\u05de\u05e6\u05d0
+            if (documentationURL && parsedResult.sources) {
+                 if (!parsedResult.sources.includes(documentationURL)) {
+                    parsedResult.sources.unshift(documentationURL);
+                }
+            } else if (documentationURL) {
+                 parsedResult.sources = [documentationURL];
+            }
             res.json(parsedResult);
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError);
-            console.error('Raw response:', apiInfo);
-            
-            // Fallback response
-            res.json({
-                serviceName: domain.replace(/\./g, ' '),
-                hasAPI: true,
-                apiType: "REST",
-                baseURL: `https://api.${domain}`,
-                documentationURL: `https://${domain}/docs`,
-                requiresAuth: true,
-                authType: "API Key",
-                keyEndpoints: ["/api/v1/data", "/api/v1/users"],
-                description: `שירות API של ${domain}`,
-                exampleRequest: `curl -H 'Authorization: Bearer TOKEN' https://api.${domain}/api/v1/data`,
-                sdkAvailable: true,
-                rateLimits: "1000 בקשות לשעה",
-                pricingModel: "freemium",
-                sources: [domain],
-                note: "ניתוח בסיסי מבוסס דומיין"
-            });
+            console.error('Raw response from Claude:', apiInfo);
+            res.status(500).json({ error: '\u05e0\u05db\u05e9\u05dc \u05d1\u05e0\u05d9\u05ea\u05d5\u05d7 \u05d4\u05ea\u05d2\u05d5\u05d1\u05d4 \u05de\u05de\u05d5\u05d3\u05dc \u05d4\u05d1\u05d9\u05e0\u05d4 \u05d4\u05de\u05dc\u05d0\u05db\u05d5\u05ea.' });
         }
         
     } catch (error) {
         console.error('Server Error:', error);
         res.status(500).json({ 
-            error: `שגיאה בשרת: ${error.message}` 
+            error: `\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05e9\u05e8\u05ea: ${error.message}` 
         });
     }
 });
