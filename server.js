@@ -13,22 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-app.get("/api/models", async (req, res) => {
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/models", {
-      headers: {
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      }
-    });
-    const j = await r.json();
-    // נחזיר רק את ה-id-ים כדי שיהיה נקי
-    res.json(j.data?.map(m => m.id) || []);
-  } catch (e) {
-    console.error("Models fetch error:", e);
-    res.status(500).json({ error: "Failed to fetch models" });
-  }
-});
+
 
 app.post('/api/analyze', async (req, res) => {
     try {
