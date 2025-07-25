@@ -7,28 +7,29 @@ const PORT = process.env.PORT || 3000;
 
 // Model configuration
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
-console.log("📤 Claude model:", MODEL);
+console.log("📤 Claude model:", `[${MODEL}]`);
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-app.get("/api/models", async (req, res) => {
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/models", {
-      headers: {
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      }
-    });
-    const j = await r.json();
-    // נחזיר רק את ה-id-ים כדי שיהיה נקי
-    res.json(j.data?.map(m => m.id) || []);
-  } catch (e) {
-    console.error("Models fetch error:", e);
-    res.status(500).json({ error: "Failed to fetch models" });
-  }
-});
+// Route removed for production - uncomment for debugging only
+// app.get("/api/models", async (req, res) => {
+//   try {
+//     const r = await fetch("https://api.anthropic.com/v1/models", {
+//       headers: {
+//         "x-api-key": process.env.ANTHROPIC_API_KEY,
+//         "anthropic-version": "2023-06-01"
+//       }
+//     });
+//     const j = await r.json();
+//     // נחזיר רק את ה-id-ים כדי שיהיה נקי
+//     res.json(j.data?.map(m => m.id) || []);
+//   } catch (e) {
+//     console.error("Models fetch error:", e);
+//     res.status(500).json({ error: "Failed to fetch models" });
+//   }
+// });
 
 app.post('/api/analyze', async (req, res) => {
     try {
@@ -140,8 +141,30 @@ JSON format:
         // \u05e0\u05d9\u05e7\u05d5\u05d9 JSON
         apiInfo = apiInfo.replace(/\`\`\`json\s*/g, '').replace(/\`\`\`\s*/g, '').trim();
         
+        let parsedResult;
         try {
-            const parsedResult = JSON.parse(apiInfo);
+            parsedResult = JSON.parse(apiInfo);
+        } catch (e) {
+            console.error("JSON Parse Error:", e, apiInfo);
+            return res.status(502).json({
+                error: "JSON_PARSE_ERROR",
+                message: e.message,
+                raw: apiInfo.slice(0, 1500)
+            });
+        }
+
+        // נרמול ונקיון keyEndpoints
+        const normalizeEndpoints = arr => Array.isArray(arr)
+            ? arr.map(ep => {
+                if (!ep) return null;
+                if (typeof ep === "string") return ep;
+                const m = (ep.method || "GET").toUpperCase();
+                const p = ep.path || "";
+                return `${m} ${p}`;
+            }).filter(Boolean)
+            : [];
+
+        parsedResult.keyEndpoints = normalizeEndpoints(parsedResult.keyEndpoints);
             
             if (domain === "api.openai.com") {
               const fixMethod = ep => {
