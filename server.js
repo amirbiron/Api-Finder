@@ -19,8 +19,7 @@ app.post('/api/analyze', async (req, res) => {
 
         const domain = new URL(url).hostname;
 
-        // Import fetch for Node.js
-        const fetch = (await import('node-fetch')).default;
+        // fetch זמין ב-Node.js 18+
 
         const response = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
