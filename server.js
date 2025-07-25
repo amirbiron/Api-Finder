@@ -12,23 +12,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Debug endpoint to get available models
-app.get("/api/models", async (req, res) => {
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/models", {
-      headers: {
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      }
-    });
-    const j = await r.json();
-    res.json(j.data.map(m => m.id));
-  } catch (e) {
-    console.error("Models fetch error:", e);
-    res.status(500).json({ error: "Failed to fetch models" });
-  }
-});
-
 app.post('/api/analyze', async (req, res) => {
     try {
         const { url } = req.body;
@@ -76,21 +59,20 @@ app.post('/api/analyze', async (req, res) => {
             throw new Error('\u05de\u05e4\u05ea\u05d7 \u05d4-API \u05e9\u05dc Anthropic \u05d0\u05d9\u05e0\u05d5 \u05de\u05d5\u05d2\u05d3\u05e8 \u05d1\u05e9\u05e8\u05ea.');
         }
         
-        // \u05d1\u05e0\u05d9\u05d9\u05ea \u05d4\u05e0\u05d7\u05d9\u05d4 \u05d4\u05d7\u05d3\u05e9 \u05d5\u05d7\u05dbמ\u05d4 \u05d9ותר \u05dcק\u05dcוד
+        // עדכון הפרומפט החדש
         const userPrompt = `You are an expert API analyst. Analyze the service at the domain "${domain}".
-I have performed a real Google search to find its API documentation.
+I performed a REAL Google search to find its API documentation.
 
-The most likely documentation URL I found is: ${documentationURL || "Not found."}
-Here are some relevant snippets from the search results:
+Most likely documentation URL: ${documentationURL || "Not found."}
+Snippets from search results:
 "${searchResultsText || "No snippets found."}"
 
-Based on this REAL information, and your general knowledge, please fill in the following JSON structure.
-- If you find a real Base URL or documentation link, use it.
-- Prioritize information from the snippets.
-- If you cannot find specific information, use the string "לא נמצא מידע". Do not invent false information.
-- Provide the real service name.
-
-Return ONLY the valid JSON object, with no other text or explanations.
+Instructions:
+- Do NOT repeat the same value in multiple fields.
+- If a field is unknown, either omit it or use the string "לא נמצא מידע" once (max one appearance in the entire JSON).
+- Only list endpoints you are reasonably sure exist. Otherwise, leave the array empty.
+- Prefer data from the snippets or the detected documentationURL over your general knowledge.
+- Return ONLY a valid JSON object. No backticks, no extra text.
 
 JSON format:
 {
@@ -110,6 +92,8 @@ JSON format:
   "sources": ["${documentationURL || domain}"]
 }`;
 
+        console.log("📤 Claude model:", MODEL);
+
         const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: {
@@ -123,8 +107,6 @@ JSON format:
                 messages: [{ role: "user", content: userPrompt }]
             })
         });
-
-        console.log("📤 model:", MODEL || "<hardcoded>");
 
         if (!anthropicResponse.ok) {
             const errorText = await anthropicResponse.text();
@@ -140,6 +122,32 @@ JSON format:
         
         try {
             const parsedResult = JSON.parse(apiInfo);
+            
+            // ניקוי כפילויות ושדות ריקים
+            const dedupe = arr => Array.isArray(arr) ? [...new Set(arr.filter(Boolean))] : [];
+
+            // איחוד/ניקוי מערכים
+            parsedResult.keyEndpoints = dedupe(parsedResult.keyEndpoints);
+            parsedResult.sources = dedupe(parsedResult.sources);
+
+            // מחיקה אם השדה הוא "לא נמצא מידע" וגם ריק/לא שימושי
+            for (const k of Object.keys(parsedResult)) {
+                if (parsedResult[k] === "לא נמצא מידע" || parsedResult[k] === "" || parsedResult[k] === null) {
+                    // השאר "לא נמצא מידע" רק פעם אחת בכל האובייקט
+                    // מצא אם כבר יש "לא נמצא מידע" בערך אחר
+                    const alreadyUsed = Object.values(parsedResult).some(v => v === "לא נמצא מידע");
+                    if (alreadyUsed) delete parsedResult[k];
+                }
+            }
+            
+            // ברירות מחדל חכמות לדומיינים מוכרים
+            if (domain === "api.openai.com") {
+                parsedResult.baseURL = parsedResult.baseURL || "https://api.openai.com/v1";
+                parsedResult.documentationURL = parsedResult.documentationURL || "https://platform.openai.com/docs/api-reference";
+                parsedResult.keyEndpoints = parsedResult.keyEndpoints?.length ? parsedResult.keyEndpoints : ["/v1/models", "/v1/chat/completions"];
+            }
+            // אפשר להוסיף כאן דומיינים נוספים לפי הצורך
+            
             // \u05d4\u05d5\u05e1\u05e4\u05ea \u05d4\u05de\u05e7\u05d5\u05e8 \u05d4\u05d0\u05de\u05d9\u05ea \u05d0\u05dd \u05e0\u05de\u05e6\u05d0
             if (documentationURL && parsedResult.sources) {
                  if (!parsedResult.sources.includes(documentationURL)) {
