@@ -151,55 +151,10 @@
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
-                            "Authorization": "Bearer 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"
                         },
                         body: JSON.stringify({
-                            model: "claude-sonnet-4-20250514",
-                            max_tokens: 2000,
-                            messages: [
-                                {
-                                    role: "user",
-                                    content: `חפש באינטרנט מידע אמיתי על האתר ${url} (domain: ${domain}).
-
-השתמש בכלי web_search שלך וחפש באמת:
-1. "${domain} API documentation"
-2. "${domain} API endpoints" 
-3. "${domain} developer docs"
-4. "${domain} API authentication"
-5. "${domain} API reference"
-
-${websiteContent ? `תוכן רלוונטי מהאתר: ${websiteContent}` : ''}
-
-אסוף רק מידע אמיתי ומדויק מהמקורות שמצאת. אם לא מוצא מידע על שדה מסוים - כתוב "לא נמצא מידע" במקום להמציא.
-
-החזר JSON עם המידע האמיתי שמצאת:
-{
-  "serviceName": "שם השירות בעברית (או באנגלית אם זה שם מותג)",
-  "hasAPI": true/false על בסיס המקורות שמצאת,
-  "apiType": "REST/GraphQL/WebSocket מהמקורות או לא נמצא מידע",
-  "baseURL": "כתובת בסיס אמיתית שמצאת או null",
-  "documentationURL": "קישור אמיתי לדוקומנטציה או null",
-  "requiresAuth": true/false על בסיס המקורות או "לא נמצא מידע",
-  "authType": "סוג authentication אמיתי או לא נמצא מידע",
-  "keyEndpoints": ["רשימת endpoints אמיתיים מהמקורות"],
-  "description": "תיאור השירות בעברית על בסיס המקורות",
-  "exampleRequest": "דוגמה אמיתית מהדוקומנטציה או null",
-  "sdkAvailable": true/false על בסיס מה שמצאת או "לא נמצא מידע",
-  "rateLimits": "מגבלות שימוש אמיתיות שמצאת בעברית או לא נמצא מידע",
-  "pricingModel": "מודל תמחור אמיתי בעברית או לא נמצא מידע",
-  "sources": ["רשימת המקורות המדויקים שמהם לקחת את המידע"]
-}
-
-חיוני: 
-- חפש באינטרנט באמת באמצעות web_search!
-- אל תמציא או תנחש שום דבר!
-- רק מידע שמופיע במקורות אמיתיים שמצאת!
-- אם לא מוצא מידע על שדה - כתוב בדיוק "לא נמצא מידע"!
-- כלול מקורות אמיתיים בשדה sources!
-
-החזר רק JSON תקין, ללא markdown או backticks או הסברים נוספים.`
-                                }
-                            ]
+                            url: url,
+                            websiteContent: websiteContent
                         })
                     });
 
