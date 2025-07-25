@@ -98,7 +98,7 @@ JSON format:
                 "anthropic-version": "2023-06-01"
             },
             body: JSON.stringify({
-                model: "claude-3-sonnet",
+                model: "claude-sonnet-20240229",
                 max_tokens: 2048,
                 messages: [{ role: "user", content: userPrompt }]
             })
