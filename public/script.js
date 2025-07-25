@@ -3,6 +3,18 @@
 // DEBUG mode via URL: add ?debug=1
 const DEBUG = new URLSearchParams(location.search).has("debug");
 
+// ממיר כל endpoint למחרוזת "METHOD PATH"
+function normalizeEndpoints(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(ep => {
+    if (!ep) return null;
+    if (typeof ep === "string") return ep;
+    const m = (ep.method || "GET").toUpperCase();
+    const p = ep.path || "";
+    return `${m} ${p}`;
+  }).filter(Boolean);
+}
+
 // Elements (שנה IDs אם שונים אצלך)
 const formEl     = document.querySelector("#analyze-form");
 const inputEl    = document.querySelector("#url-input");
@@ -48,7 +60,7 @@ async function analyze(url) {
       return;
     }
 
-    // נרמול אנדפוינטים למקרה שקיבלנו אובייקטים:
+    // נרמול אנדפוינטים
     data.keyEndpoints = normalizeEndpoints(data.keyEndpoints);
 
     renderResult(data);
@@ -104,18 +116,6 @@ function debugBox(text) {
     document.body.appendChild(box);
   }
   box.textContent = text;
-}
-
-// ממיר כל endpoint למחרוזת "METHOD PATH"
-function normalizeEndpoints(list) {
-  if (!Array.isArray(list)) return [];
-  return list.map(ep => {
-    if (!ep) return null;
-    if (typeof ep === "string") return ep;
-    const m = (ep.method || "GET").toUpperCase();
-    const p = ep.path || "";
-    return `${m} ${p}`;
-  }).filter(Boolean);
 }
 
 // רנדר תוצאה למסך
