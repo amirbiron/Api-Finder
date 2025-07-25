@@ -26,7 +26,7 @@ app.post('/api/analyze', async (req, res) => {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${process.env.ANTHROPIC_API_KEY}`
+                "x-api-key": process.env.ANTHROPIC_API_KEY
             },
             body: JSON.stringify({
                 model: "claude-3-5-sonnet-20241022",
