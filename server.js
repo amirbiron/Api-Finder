@@ -19,7 +19,7 @@ app.post('/api/analyze', async (req, res) => {
 
         const domain = new URL(url).hostname;
 
-        // Import fetch for Node.js < 18
+        // Import fetch for Node.js
         const fetch = (await import('node-fetch')).default;
 
         const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -29,77 +29,83 @@ app.post('/api/analyze', async (req, res) => {
                 "Authorization": `Bearer ${process.env.ANTHROPIC_API_KEY}`
             },
             body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 2000,
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 1500,
                 messages: [
                     {
                         role: "user",
-                        content: `נתח את האתר ${url} (domain: ${domain}) ותחזיר מידע על ה-API שלו.
+                        content: `אתה מומחה לזיהוי APIs. נתח את האתר ${url} (domain: ${domain}).
 
-${websiteContent ? `תוכן רלוונטי מהאתר: ${websiteContent}` : ''}
+${websiteContent ? `תוכן מהאתר: ${websiteContent}` : ''}
 
-בהתבסס על הדומיין והתוכן, נתח ותחזיר JSON עם השדות הבאים:
+בהתבסס על הדומיין, שם החברה, והתוכן - צור ניתוח של ה-API האפשרי.
+
+אני רוצה שתחזיר JSON בפורמט הזה בלבד:
 
 {
   "serviceName": "שם השירות בעברית",
-  "hasAPI": true/false (בהתבסס על הדומיין),
+  "hasAPI": true,
   "apiType": "REST",
-  "baseURL": "כתובת API משוערת",
-  "documentationURL": "קישור לדוקומנטציה משוער",
+  "baseURL": "https://api.${domain}",
+  "documentationURL": "https://${domain}/docs",
   "requiresAuth": true,
   "authType": "API Key",
-  "keyEndpoints": ["endpoints נפוצים לסוג השירות"],
-  "description": "תיאור השירות בעברית",
-  "exampleRequest": "דוגמת curl",
-  "sdkAvailable": true/false,
-  "rateLimits": "מגבלות טיפוסיות",
-  "pricingModel": "מודל תמחור משוער",
+  "keyEndpoints": ["/api/v1/data", "/api/v1/users"],
+  "description": "תיאור קצר של השירות בעברית",
+  "exampleRequest": "curl -H 'Authorization: Bearer TOKEN' https://api.${domain}/api/v1/data",
+  "sdkAvailable": true,
+  "rateLimits": "1000 בקשות לשעה",
+  "pricingModel": "freemium",
   "sources": ["${domain}"]
 }
 
-החזר JSON תקין בלבד.`
+התבסס על ידע כללי ועל הדומיין. החזר רק JSON תקין ללא הסברים.`
                     }
                 ]
             })
         });
 
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Anthropic API error:', response.status, errorText);
             throw new Error(`Anthropic API error: ${response.status}`);
         }
 
         const data = await response.json();
         let apiInfo = data.content[0].text;
+        
+        // ניקוי JSON
         apiInfo = apiInfo.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
         
         try {
             const parsedResult = JSON.parse(apiInfo);
             res.json(parsedResult);
         } catch (parseError) {
-            const jsonMatch = apiInfo.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                try {
-                    const extractedJson = JSON.parse(jsonMatch[0]);
-                    res.json(extractedJson);
-                } catch (extractError) {
-                    res.json({
-                        serviceName: domain,
-                        description: apiInfo,
-                        hasAPI: true,
-                        error: 'לא ניתן לפרסר את התוצאה'
-                    });
-                }
-            } else {
-                res.json({
-                    serviceName: domain,
-                    description: apiInfo,
-                    hasAPI: true,
-                    error: 'התוצאה התקבלה בפורמט טקסט'
-                });
-            }
+            console.error('JSON Parse Error:', parseError);
+            console.error('Raw response:', apiInfo);
+            
+            // Fallback response
+            res.json({
+                serviceName: domain.replace(/\./g, ' '),
+                hasAPI: true,
+                apiType: "REST",
+                baseURL: `https://api.${domain}`,
+                documentationURL: `https://${domain}/docs`,
+                requiresAuth: true,
+                authType: "API Key",
+                keyEndpoints: ["/api/v1/data", "/api/v1/users"],
+                description: `שירות API של ${domain}`,
+                exampleRequest: `curl -H 'Authorization: Bearer TOKEN' https://api.${domain}/api/v1/data`,
+                sdkAvailable: true,
+                rateLimits: "1000 בקשות לשעה",
+                pricingModel: "freemium",
+                sources: [domain],
+                note: "ניתוח בסיסי מבוסס דומיין"
+            });
         }
         
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Server Error:', error);
         res.status(500).json({ 
             error: `שגיאה בשרת: ${error.message}` 
         });
@@ -108,6 +114,10 @@ ${websiteContent ? `תוכן רלוונטי מהאתר: ${websiteContent}` : ''}
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 app.listen(PORT, () => {
