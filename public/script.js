@@ -3,48 +3,74 @@
 // DEBUG mode via URL: add ?debug=1
 const DEBUG = new URLSearchParams(location.search).has("debug");
 
-// מנקה אנדפוינטים ומסיר רווחים כפולים
-function cleanEndpoints(arr, baseURL = "") {
+function fixEndpoints(arr, baseURL = "") {
   if (!Array.isArray(arr)) return [];
   const base = (baseURL || "").replace(/\/$/, "");
+
+  const METHODS = ["GET","POST","PUT","DELETE","PATCH","HEAD","OPTIONS"];
+  const methodRe = new RegExp("^(" + METHODS.join("|") + ")\\b", "i");
+  const anyMethodRe = new RegExp("\\b(" + METHODS.join("|") + ")\\b", "gi");
+
   return arr
     .map(ep => {
       if (!ep) return null;
 
-      // אם הגיע כאובייקט
+      // אובייקט כבר מפורק
       if (typeof ep === "object") {
         const method = (ep.method || "GET").toUpperCase();
-        let path = ep.path || "";
+        let path = (ep.path || "").trim();
         path = path.startsWith("/") ? path : "/" + path;
         return { method, path };
       }
 
-      // אם הגיע כמחרוזת
-      const cleaned = ep.replace(/\s+/g, " ").trim();          // מנקה רווחים כפולים
-      const parts = cleaned.split(" ");
-      const method = (parts.shift() || "GET").toUpperCase();
-      let path = parts.join(" ").trim();
+      // מחרוזת – ננקה רווחים ושיטות כפולות
+      let s = ep.replace(/\s+/g, " ").trim();
 
-      // מסיר baseURL אם שובץ בפנים
-      if (path.startsWith(base)) path = path.slice(base.length);
-      path = path.startsWith("/") ? path : "/" + path;
+      // אם דחוס: https://api...POST /path  -> נפריד בין הדומיין למתודה
+      s = s.replace(/(https?:\/\/[^\s]+?)(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)/i, "$1 $2");
 
+      // מצא מתודה
+      let method = "GET";
+      const m = s.match(methodRe);
+      if (m) {
+        method = m[1].toUpperCase();
+        s = s.replace(methodRe, "").trim();
+      }
+
+      // מחק כל שאר המתודות שהשתרבבו בטקסט
+      s = s.replace(anyMethodRe, "").trim();
+
+      // הורד baseURL אם קיים
+      if (base && s.startsWith(base)) s = s.slice(base.length);
+
+      // אם נשאר URL מלא – חתוך רק את ה-path
+      if (/^https?:\/\//i.test(s)) {
+        try {
+          const u = new URL(s);
+          s = u.pathname + (u.search || "");
+        } catch (_) {}
+      }
+
+      let path = s.startsWith("/") ? s : "/" + s;
       return { method, path };
     })
     .filter(Boolean);
 }
 
-// רנדר רשימת אנדפוינטים
 function renderEndpoints(list, baseURL = "") {
   if (!list || !list.length) return "";
   const base = (baseURL || "").replace(/\/$/, "");
   return `
     <p><strong>Endpoints עיקריים:</strong></p>
-    <ul>
+    <ul class="endpoints-list">
       ${list
         .map(({ method, path }) => {
           const full = path.startsWith("http") ? path : base + path;
-          return `<li><span class="method">${method}</span> <a href="${full}" target="_blank">${full}</a></li>`;
+          return `
+            <li>
+              <span class="http-method" data-method="${method}">${method}</span>
+              <a href="${full}" target="_blank" rel="noopener">${full}</a>
+            </li>`;
         })
         .join("")}
     </ul>
@@ -97,7 +123,7 @@ async function analyze(url) {
     }
 
     // נרמול אנדפוינטים
-    data.keyEndpoints = cleanEndpoints(data.keyEndpoints, data.baseURL);
+    data.keyEndpoints = fixEndpoints(data.keyEndpoints, data.baseURL);
 
     renderResult(data);
     if (DEBUG) debugBox(JSON.stringify(data, null, 2));

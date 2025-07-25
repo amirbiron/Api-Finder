@@ -13,6 +13,52 @@
         [dir="rtl"] .text-right { text-align: right; }
         [dir="rtl"] .mr-2 { margin-left: 0.5rem; margin-right: 0; }
         [dir="rtl"] .ml-2 { margin-right: 0.5rem; margin-left: 0; }
+        
+        /* Endpoints styling */
+        .endpoints-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .endpoints-list li {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .http-method {
+            display: inline-block;
+            padding: 4px 8px;
+            margin-left: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .http-method:contains("GET") { background: #d4edda; color: #155724; }
+        .http-method:contains("POST") { background: #d1ecf1; color: #0c5460; }
+        .http-method:contains("PUT") { background: #fff3cd; color: #856404; }
+        .http-method:contains("DELETE") { background: #f8d7da; color: #721c24; }
+        .http-method:contains("PATCH") { background: #e2e3e5; color: #383d41; }
+        .http-method:contains("HEAD") { background: #d1ecf1; color: #0c5460; }
+        .http-method:contains("OPTIONS") { background: #e2e3e5; color: #383d41; }
+        
+        /* Fallback for method colors */
+        .http-method[data-method="GET"] { background: #d4edda; color: #155724; }
+        .http-method[data-method="POST"] { background: #d1ecf1; color: #0c5460; }
+        .http-method[data-method="PUT"] { background: #fff3cd; color: #856404; }
+        .http-method[data-method="DELETE"] { background: #f8d7da; color: #721c24; }
+        .http-method[data-method="PATCH"] { background: #e2e3e5; color: #383d41; }
+        .http-method[data-method="HEAD"] { background: #d1ecf1; color: #0c5460; }
+        .http-method[data-method="OPTIONS"] { background: #e2e3e5; color: #383d41; }
     </style>
 </head>
 <body>
