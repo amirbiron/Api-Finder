@@ -19,6 +19,7 @@ function showRaw(text) {
     box.style.fontSize = "12px";
     box.style.zIndex = "9999";
     box.style.whiteSpace = "pre-wrap";
+    box.style.pointerEvents = "auto";
     document.body.appendChild(box);
   }
   box.textContent = text;
@@ -220,12 +221,18 @@ const APIDetectorBot = () => {
         if (!result?.baseURL || !result?.keyEndpoints?.length) return '';
         
         const endpoint = result.keyEndpoints[0];
+        const endpointPath = typeof endpoint === "string" ? 
+            (endpoint.includes(' ') ? endpoint.split(' ')[1] : endpoint) : 
+            endpoint.path;
+        const method = typeof endpoint === "string" ? 
+            (endpoint.includes(' ') ? endpoint.split(' ')[0] : "GET") : 
+            endpoint.method;
         const authHeader = result.requiresAuth ? 
             (result.authType === 'API Key' ? `'Authorization': 'Bearer YOUR_API_KEY'` : `'Authorization': 'Bearer YOUR_TOKEN'`) : '';
         
         return `// דוגמה לשימוש ב-JavaScript
-fetch('${result.baseURL}${endpoint}', {
-  method: 'GET',
+fetch('${result.baseURL}${endpointPath}', {
+  method: '${method}',
   headers: {
     'Content-Type': 'application/json',${authHeader ? '\n    ' + authHeader : ''}
   }
@@ -359,7 +366,13 @@ fetch('${result.baseURL}${endpoint}', {
                                             {result.keyEndpoints.slice(0, 5).map((endpoint, index) => (
                                                 <div key={index} className="bg-white p-2 sm:p-3 rounded border border-green-200">
                                                     <code className="font-mono text-xs sm:text-sm text-green-700 block break-all">
-                                                        GET {result.baseURL || ''}{endpoint}
+                                                        {typeof endpoint === "string" ? 
+                                                            (endpoint.includes(' ') ? 
+                                                                `${endpoint.split(' ')[0]} ${result.baseURL || ''}${endpoint.split(' ')[1]}` : 
+                                                                `GET ${result.baseURL || ''}${endpoint}`
+                                                            ) : 
+                                                            `${endpoint.method} ${result.baseURL || ''}${endpoint.path}`
+                                                        }
                                                     </code>
                                                 </div>
                                             ))}
