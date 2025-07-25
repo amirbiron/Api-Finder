@@ -14,7 +14,12 @@ function normalizeEndpoints(list, baseURL = "") {
   const base = (baseURL || "").replace(/\/$/, "");
   const METHODS = ["GET","POST","PUT","DELETE","PATCH","HEAD","OPTIONS"];
   const RE_ANY   = new RegExp(`\\b(${METHODS.join("|")})\\b`, "gi");
-  const RE_TIGHT = new RegExp(`(https?:\\/\\/[^\\s]+?)(${METHODS.join("|")})`, "i");
+  // שיפור הרגקס לזיהוי טוב יותר של methods דבוקים
+  const RE_TIGHT = new RegExp(`(https?:\\/\\/[^\\s]+?)\\s*(${METHODS.join("|")})`, "gi");
+  // רגקס נוסף לזיהוי methods דבוקים בתחילת מחרוזת
+  const RE_METHODS_STUCK = new RegExp(`(${METHODS.join("|")})(${METHODS.join("|")})`, "gi");
+  // רגקס לזיהוי method דבוק לpath: GETPOST/api -> GET POST/api
+  const RE_METHOD_PATH_STUCK = new RegExp(`(${METHODS.join("|")})(${METHODS.join("|")})(/[^\\s]*)`, "gi");
 
   return list
     .map(ep => {
@@ -22,17 +27,19 @@ function normalizeEndpoints(list, baseURL = "") {
 
       // כבר אובייקט?
       if (typeof ep === "object") {
-        const m = (ep.method || "GET").toUpperCase();
-        let p = (ep.path || "").trim();
-        p = p.startsWith("/") ? p : "/" + p;
-        return `${m} ${p}`;
+        const method = (ep.method || "GET").toUpperCase();
+        let path = (ep.path || "").trim();
+        path = path.startsWith("/") ? path : "/" + path;
+        return { method, path };
       }
 
       // מחרוזת
       let s = ep.replace(/\s+/g, " ").trim();
 
-      // הפרדה אם דבוק: ...comPOST
+      // הפרדה אם דבוק: ...comPOST או GETPOST
       s = s.replace(RE_TIGHT, "$1 $2");
+      s = s.replace(RE_METHODS_STUCK, "$1 $2");
+      s = s.replace(RE_METHOD_PATH_STUCK, "$1 $2$3");
 
       // חילוץ method ראשון
       const mMatch = s.match(RE_ANY);
@@ -48,7 +55,7 @@ function normalizeEndpoints(list, baseURL = "") {
       }
 
       const path = s.startsWith("/") ? s : "/" + s;
-      return `${method} ${path}`;
+      return { method, path };
     })
     .filter(Boolean);
 }
@@ -195,7 +202,7 @@ JSON format:
           });
         }
 
-        // --- Normalize endpoints to strings ---
+        // --- Normalize endpoints to objects ---
         parsedResult.keyEndpoints = normalizeEndpoints(parsedResult.keyEndpoints, parsedResult.baseURL || parsedResult.baseUrl || parsedResult.base_url || "");
             
             if (domain === "api.openai.com") {
@@ -222,9 +229,20 @@ JSON format:
             
             // ניקוי כפילויות ושדות ריקים
             const dedupe = arr => Array.isArray(arr) ? [...new Set(arr.filter(Boolean))] : [];
+            const dedupeEndpoints = arr => {
+              if (!Array.isArray(arr)) return [];
+              const seen = new Set();
+              return arr.filter(ep => {
+                if (!ep) return false;
+                const key = typeof ep === 'object' ? `${ep.method} ${ep.path}` : ep;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+            };
 
             // איחוד/ניקוי מערכים
-            parsedResult.keyEndpoints = dedupe(parsedResult.keyEndpoints);
+            parsedResult.keyEndpoints = dedupeEndpoints(parsedResult.keyEndpoints);
             parsedResult.sources = dedupe(parsedResult.sources);
 
             // מחיקה אם השדה הוא "לא נמצא מידע" וגם ריק/לא שימושי
@@ -241,7 +259,10 @@ JSON format:
             if (domain === "api.openai.com") {
                 parsedResult.baseURL = parsedResult.baseURL || "https://api.openai.com/v1";
                 parsedResult.documentationURL = parsedResult.documentationURL || "https://platform.openai.com/docs/api-reference";
-                parsedResult.keyEndpoints = parsedResult.keyEndpoints?.length ? parsedResult.keyEndpoints : ["/v1/models", "/v1/chat/completions"];
+                parsedResult.keyEndpoints = parsedResult.keyEndpoints?.length ? parsedResult.keyEndpoints : [
+                    { method: "GET", path: "/v1/models" }, 
+                    { method: "POST", path: "/v1/chat/completions" }
+                ];
             }
             // אפשר להוסיף כאן דומיינים נוספים לפי הצורך
             
