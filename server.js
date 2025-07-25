@@ -73,6 +73,8 @@ Instructions:
 - Only list endpoints you are reasonably sure exist. Otherwise, leave the array empty.
 - Prefer data from the snippets or the detected documentationURL over your general knowledge.
 - Return ONLY a valid JSON object. No backticks, no extra text.
+- Return keyEndpoints as objects with method and path.
+- Use POST for completions/responses; GET רק למודלים/קבצים וכו'.
 
 JSON format:
 {
@@ -83,7 +85,7 @@ JSON format:
   "documentationURL": "${documentationURL || `https://${domain}/docs`}",
   "requiresAuth": true,
   "authType": "API Key",
-  "keyEndpoints": ["/api/v1/data", "/api/v1/users"],
+  "keyEndpoints": [{"method": "GET", "path": "/api/v1/data"}, {"method": "POST", "path": "/api/v1/users"}],
   "description": "תיאור קצר של השירות בעברית",
   "exampleRequest": "curl -H 'Authorization: Bearer TOKEN' https://api.${domain}/api/v1/data",
   "sdkAvailable": false,
@@ -122,6 +124,28 @@ JSON format:
         
         try {
             const parsedResult = JSON.parse(apiInfo);
+            
+            if (domain === "api.openai.com") {
+              const fixMethod = ep => {
+                if (!ep) return ep;
+                if (typeof ep === "string") {
+                  const guess = { method: "GET", path: ep };
+                  if (/\/v1\/(chat\/)?completions|\/v1\/responses/.test(ep)) guess.method = "POST";
+                  return guess;
+                }
+                if (ep.path && /\/v1\/(chat\/)?completions|\/v1\/responses/.test(ep.path)) ep.method = "POST";
+                return ep;
+                };
+              parsedResult.keyEndpoints = (parsedResult.keyEndpoints || []).map(fixMethod);
+              if (!parsedResult.keyEndpoints.length) {
+                parsedResult.keyEndpoints = [
+                  { method: "POST", path: "/v1/responses" },
+                  { method: "POST", path: "/v1/chat/completions" },
+                  { method: "POST", path: "/v1/completions" },
+                  { method: "GET",  path: "/v1/models" }
+                ];
+              }
+            }
             
             // ניקוי כפילויות ושדות ריקים
             const dedupe = arr => Array.isArray(arr) ? [...new Set(arr.filter(Boolean))] : [];
