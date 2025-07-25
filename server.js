@@ -9,6 +9,19 @@ const PORT = process.env.PORT || 3000;
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
 console.log("📤 Claude model:", `[${MODEL}]`);
 
+function normalizeEndpoints(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map(ep => {
+      if (!ep) return null;
+      if (typeof ep === "string") return ep;
+      const m = (ep.method || "GET").toUpperCase();
+      const p = ep.path || "";
+      return `${m} ${p}`;
+    })
+    .filter(Boolean);
+}
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
@@ -138,32 +151,20 @@ JSON format:
         const data = await anthropicResponse.json();
         let apiInfo = data.content[0].text;
         
-        // \u05e0\u05d9\u05e7\u05d5\u05d9 JSON
-        apiInfo = apiInfo.replace(/\`\`\`json\s*/g, '').replace(/\`\`\`\s*/g, '').trim();
-        
+        // --- Parse Claude reply safely ---
         let parsedResult;
         try {
-            parsedResult = JSON.parse(apiInfo);
+          parsedResult = JSON.parse(apiInfo);
         } catch (e) {
-            console.error("JSON Parse Error:", e, apiInfo);
-            return res.status(502).json({
-                error: "JSON_PARSE_ERROR",
-                message: e.message,
-                raw: apiInfo.slice(0, 1500)
-            });
+          console.error("JSON Parse Error:", e, apiInfo);
+          return res.status(502).json({
+            error: "JSON_PARSE_ERROR",
+            message: e.message,
+            raw: apiInfo.slice(0, 1500)
+          });
         }
 
-        // נרמול ונקיון keyEndpoints
-        const normalizeEndpoints = arr => Array.isArray(arr)
-            ? arr.map(ep => {
-                if (!ep) return null;
-                if (typeof ep === "string") return ep;
-                const m = (ep.method || "GET").toUpperCase();
-                const p = ep.path || "";
-                return `${m} ${p}`;
-            }).filter(Boolean)
-            : [];
-
+        // --- Normalize endpoints to strings ---
         parsedResult.keyEndpoints = normalizeEndpoints(parsedResult.keyEndpoints);
             
             if (domain === "api.openai.com") {
@@ -213,20 +214,16 @@ JSON format:
             }
             // אפשר להוסיף כאן דומיינים נוספים לפי הצורך
             
-            // \u05d4\u05d5\u05e1\u05e4\u05ea \u05d4\u05de\u05e7\u05d5\u05e8 \u05d4\u05d0\u05de\u05d9\u05ea \u05d0\u05dd \u05e0\u05de\u05e6\u05d0
+            // keep documentationURL in sources
             if (documentationURL && parsedResult.sources) {
-                 if (!parsedResult.sources.includes(documentationURL)) {
-                    parsedResult.sources.unshift(documentationURL);
-                }
+              if (!parsedResult.sources.includes(documentationURL)) {
+                parsedResult.sources.unshift(documentationURL);
+              }
             } else if (documentationURL) {
-                 parsedResult.sources = [documentationURL];
+              parsedResult.sources = [documentationURL];
             }
-            res.json(parsedResult);
-        } catch (parseError) {
-            console.error('JSON Parse Error:', parseError);
-            console.error('Raw response from Claude:', apiInfo);
-            res.status(502).json({error:"JSON_PARSE_ERROR", message:parseError.message, raw: apiInfo.slice(0,1500)});
-        }
+
+            return res.json(parsedResult);
         
     } catch (error) {
         console.error('Server Error:', error);
