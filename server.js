@@ -5,9 +5,29 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Model configuration
+const MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20241022";
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// Debug endpoint to get available models
+app.get("/api/models", async (req, res) => {
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/models", {
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      }
+    });
+    const j = await r.json();
+    res.json(j.data.map(m => m.id));
+  } catch (e) {
+    console.error("Models fetch error:", e);
+    res.status(500).json({ error: "Failed to fetch models" });
+  }
+});
 
 app.post('/api/analyze', async (req, res) => {
     try {
@@ -98,11 +118,13 @@ JSON format:
                 "anthropic-version": "2023-06-01"
             },
             body: JSON.stringify({
-                model: "claude-sonnet",
+                model: MODEL,
                 max_tokens: 2048,
                 messages: [{ role: "user", content: userPrompt }]
             })
         });
+
+        console.log("📤 model:", MODEL || "<hardcoded>");
 
         if (!anthropicResponse.ok) {
             const errorText = await anthropicResponse.text();
