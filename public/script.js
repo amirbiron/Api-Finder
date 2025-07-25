@@ -10,6 +10,9 @@ function fixEndpoints(arr, baseURL = "") {
   const METHODS = ["GET","POST","PUT","DELETE","PATCH","HEAD","OPTIONS"];
   const methodRe = new RegExp("^(" + METHODS.join("|") + ")\\b", "i");
   const anyMethodRe = new RegExp("\\b(" + METHODS.join("|") + ")\\b", "gi");
+  // רגקס משופר לזיהוי methods דבוקים
+  const stuckMethodsRe = new RegExp("(" + METHODS.join("|") + ")(" + METHODS.join("|") + ")", "gi");
+  const methodPathStuckRe = new RegExp("(" + METHODS.join("|") + ")(" + METHODS.join("|") + ")(/[^\\s]*)", "gi");
 
   return arr
     .map(ep => {
@@ -27,7 +30,10 @@ function fixEndpoints(arr, baseURL = "") {
       let s = ep.replace(/\s+/g, " ").trim();
 
       // אם דחוס: https://api...POST /path  -> נפריד בין הדומיין למתודה
-      s = s.replace(/(https?:\/\/[^\s]+?)(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)/i, "$1 $2");
+      s = s.replace(/(https?:\/\/[^\s]+?)\s*(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)/gi, "$1 $2");
+      
+      // הפרדת methods דבוקים: GETPOST -> GET POST
+      s = s.replace(stuckMethodsRe, "$1 $2");
 
       // מצא מתודה
       let method = "GET";
