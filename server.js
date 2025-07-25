@@ -6,7 +6,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Model configuration
-const MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20241022";
+const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
+console.log("📤 Claude model:", MODEL);
 
 app.use(cors());
 app.use(express.json());
@@ -201,7 +202,7 @@ JSON format:
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError);
             console.error('Raw response from Claude:', apiInfo);
-            res.status(500).json({ error: '\u05e0\u05db\u05e9\u05dc \u05d1\u05e0\u05d9\u05ea\u05d5\u05d7 \u05d4\u05ea\u05d2\u05d5\u05d1\u05d4 \u05de\u05de\u05d5\u05d3\u05dc \u05d4\u05d1\u05d9\u05e0\u05d4 \u05d4\u05de\u05dc\u05d0\u05db\u05d5\u05ea.' });
+            res.status(502).json({error:"JSON_PARSE_ERROR", message:parseError.message, raw: apiInfo.slice(0,1500)});
         }
         
     } catch (error) {
