@@ -163,38 +163,7 @@
                     }
 
                     const data = await response.json();
-                    let apiInfo = data.content[0].text;
-                    
-                    // ניקוי JSON מ-markdown blocks
-                    apiInfo = apiInfo.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-                    
-                    try {
-                        const parsedResult = JSON.parse(apiInfo);
-                        setResult(parsedResult);
-                    } catch (parseError) {
-                        // אם הJSON לא תקין, ננסה לחלץ אותו מהטקסט
-                        const jsonMatch = apiInfo.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) {
-                            try {
-                                const extractedJson = JSON.parse(jsonMatch[0]);
-                                setResult(extractedJson);
-                            } catch (extractError) {
-                                setResult({
-                                    serviceName: domain,
-                                    description: apiInfo,
-                                    hasAPI: true,
-                                    error: 'לא ניתן לפרסר את התוצאה כ-JSON'
-                                });
-                            }
-                        } else {
-                            setResult({
-                                serviceName: domain,
-                                description: apiInfo,
-                                hasAPI: true,
-                                error: 'התוצאה התקבלה בפורמט טקסט'
-                            });
-                        }
-                    }
+                    setResult(data);
                     
                 } catch (err) {
                     setError(err.message);
