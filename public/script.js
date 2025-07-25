@@ -31,31 +31,31 @@ async function analyze(url) {
       body: JSON.stringify({ url })
     });
 
+    const raw = await res.text();
+
     if (!res.ok) {
-      const txt = await res.text();
-      debugBox(`Server error (${res.status}):\n\n${txt}`);
-      notify("שגיאה בשרת. ראה פרטים בתחתית.");
+      console.error("Server error:", res.status, raw);
+      alert("שגיאה בשרת (ראה קונסול)");
       return;
     }
 
-    const rawText = await res.text();
     let data;
     try {
-      data = JSON.parse(rawText);
+      data = JSON.parse(raw);
     } catch (e) {
-      debugBox(`JSON parse error: ${e.message}\n\nRAW:\n${rawText.slice(0, 2000)}`);
-      notify("שגיאה בפענוח JSON. ראה פרטים בתחתית.");
+      console.error("JSON parse error:", e, raw);
+      alert("JSON שבור מהשרת (ראה קונסול)");
       return;
     }
 
-    // נרמול endpoints (אם הגיעו כאובייקטים או כמחרוזות)
+    // נרמול אנדפוינטים למקרה שקיבלנו אובייקטים:
     data.keyEndpoints = normalizeEndpoints(data.keyEndpoints);
 
     renderResult(data);
     if (DEBUG) debugBox(JSON.stringify(data, null, 2));
   } catch (e) {
-    debugBox(`Network/JS error: ${e.message}`);
-    notify("שגיאת רשת/JS – בדוק קונסול.");
+    console.error("Network/JS error:", e);
+    alert("שגיאת רשת/JS – בדוק קונסול.");
   } finally {
     showSpinner(false);
   }
@@ -107,17 +107,14 @@ function debugBox(text) {
 }
 
 // ממיר כל endpoint למחרוזת "METHOD PATH"
-function normalizeEndpoints(arr) {
-  if (!Array.isArray(arr)) return [];
-  return arr.map(ep => {
+function normalizeEndpoints(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(ep => {
     if (!ep) return null;
     if (typeof ep === "string") return ep;
-    if (typeof ep === "object") {
-      const m = (ep.method || "GET").toUpperCase();
-      const p = ep.path || "";
-      return `${m} ${p}`;
-    }
-    return null;
+    const m = (ep.method || "GET").toUpperCase();
+    const p = ep.path || "";
+    return `${m} ${p}`;
   }).filter(Boolean);
 }
 
