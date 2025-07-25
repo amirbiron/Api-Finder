@@ -2,14 +2,26 @@ const { useState } = React;
 
 // פונקציה להצגת טקסט גולמי על המסך
 function showRaw(text) {
-  const pre = document.createElement("pre");
-  pre.style.whiteSpace = "pre-wrap";
-  pre.style.padding = "16px";
-  pre.style.background = "#111";
-  pre.style.color = "#0f0";
-  pre.textContent = text;
-  document.body.innerHTML = "";
-  document.body.appendChild(pre);
+  let box = document.getElementById("debug-box");
+  if (!box) {
+    box = document.createElement("pre");
+    box.id = "debug-box";
+    box.style.position = "fixed";
+    box.style.bottom = "0";
+    box.style.left = "0";
+    box.style.width = "100%";
+    box.style.maxHeight = "40vh";
+    box.style.overflow = "auto";
+    box.style.margin = "0";
+    box.style.padding = "12px";
+    box.style.background = "#111";
+    box.style.color = "#0f0";
+    box.style.fontSize = "12px";
+    box.style.zIndex = "9999";
+    box.style.whiteSpace = "pre-wrap";
+    document.body.appendChild(box);
+  }
+  box.textContent = text;
 }
 
 // Lucide Icons as SVG components
@@ -123,9 +135,8 @@ const APIDetectorBot = () => {
                 return;
             }
 
-            // אם renderResult קיימת ושקטה – השאר. אחרת, בינתיים נציג Raw:
-            // renderResult(data);
-            showRaw(JSON.stringify(data, null, 2));
+            // הצגת התוצאות דרך React state
+            setResult(data);
         } catch (e) {
             showRaw("Network/JS error: " + e.message);
         }
@@ -181,13 +192,24 @@ const APIDetectorBot = () => {
             });
 
             if (!response.ok) {
+                const txt = await response.text();
+                showRaw("Server error (" + response.status + "):\n\n" + txt);
                 throw new Error(`שגיאה ב-API: ${response.status}`);
             }
 
-            const data = await response.json();
+            const rawText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch (e) {
+                showRaw("JSON parse error: " + e.message + "\n\nRAW:\n" + rawText.slice(0,2000));
+                throw new Error("JSON parse error: " + e.message);
+            }
+
             setResult(data);
             
         } catch (err) {
+            showRaw("Network/JS error: " + err.message);
             setError(err.message);
         } finally {
             setLoading(false);
