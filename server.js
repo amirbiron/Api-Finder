@@ -19,6 +19,9 @@ app.post('/api/analyze', async (req, res) => {
 
         const domain = new URL(url).hostname;
 
+        // Import fetch for Node.js < 18
+        const fetch = (await import('node-fetch')).default;
+
         const response = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: {
@@ -31,36 +34,30 @@ app.post('/api/analyze', async (req, res) => {
                 messages: [
                     {
                         role: "user",
-                        content: `חפש באינטרנט מידע אמיתי על האתר ${url} (domain: ${domain}).
-
-השתמש בכלי web_search שלך וחפש באמת:
-1. "${domain} API documentation"
-2. "${domain} API endpoints" 
-3. "${domain} developer docs"
+                        content: `נתח את האתר ${url} (domain: ${domain}) ותחזיר מידע על ה-API שלו.
 
 ${websiteContent ? `תוכן רלוונטי מהאתר: ${websiteContent}` : ''}
 
-אסוף רק מידע אמיתי ומדויק מהמקורות שמצאת. אם לא מוצא מידע - כתוב "לא נמצא מידע".
+בהתבסס על הדומיין והתוכן, נתח ותחזיר JSON עם השדות הבאים:
 
-החזר JSON עם:
 {
   "serviceName": "שם השירות בעברית",
-  "hasAPI": true/false על בסיס המקורות,
-  "apiType": "REST/GraphQL מהמקורות או לא נמצא מידע",
-  "baseURL": "כתובת אמיתית או null",
-  "documentationURL": "קישור אמיתי או null",
-  "requiresAuth": true/false מהמקורות,
-  "authType": "סוג אמיתי או לא נמצא מידע",
-  "keyEndpoints": ["endpoints אמיתיים"],
-  "description": "תיאור בעברית מהמקורות",
-  "exampleRequest": "דוגמה אמיתית או null",
-  "sdkAvailable": true/false מהמקורות,
-  "rateLimits": "מגבלות אמיתיות בעברית או לא נמצא מידע",
-  "pricingModel": "תמחור אמיתי בעברית או לא נמצא מידע",
-  "sources": ["מקורות אמיתיים"]
+  "hasAPI": true/false (בהתבסס על הדומיין),
+  "apiType": "REST",
+  "baseURL": "כתובת API משוערת",
+  "documentationURL": "קישור לדוקומנטציה משוער",
+  "requiresAuth": true,
+  "authType": "API Key",
+  "keyEndpoints": ["endpoints נפוצים לסוג השירות"],
+  "description": "תיאור השירות בעברית",
+  "exampleRequest": "דוגמת curl",
+  "sdkAvailable": true/false,
+  "rateLimits": "מגבלות טיפוסיות",
+  "pricingModel": "מודל תמחור משוער",
+  "sources": ["${domain}"]
 }
 
-חיוני: חפש באמת ואל תמציא! רק מידע ממקורות אמיתיים!`
+החזר JSON תקין בלבד.`
                     }
                 ]
             })
