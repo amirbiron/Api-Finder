@@ -89,6 +89,166 @@
             </svg>
         );
 
+        // פונקציה לניתוח מקומי של אתרים
+        const analyzeWebsiteLocally = (url, domain, websiteContent) => {
+            // מאגר מידע על שירותים נפוצים
+            const knownServices = {
+                'github.com': {
+                    serviceName: 'GitHub',
+                    hasAPI: true,
+                    apiType: 'REST',
+                    baseURL: 'https://api.github.com',
+                    documentationURL: 'https://docs.github.com/en/rest',
+                    requiresAuth: true,
+                    authType: 'Personal Access Token',
+                    keyEndpoints: ['/user', '/repos', '/issues', '/pulls', '/search/repositories'],
+                    description: 'פלטפורמת פיתוח וניהול קוד מקור',
+                    exampleRequest: 'curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user',
+                    sdkAvailable: true,
+                    rateLimits: '5000 בקשות לשעה למשתמשים מאומתים',
+                    pricingModel: 'חינמי עם מגבלות, תוכניות בתשלום'
+                },
+                'api.openai.com': {
+                    serviceName: 'OpenAI',
+                    hasAPI: true,
+                    apiType: 'REST',
+                    baseURL: 'https://api.openai.com/v1',
+                    documentationURL: 'https://platform.openai.com/docs',
+                    requiresAuth: true,
+                    authType: 'API Key',
+                    keyEndpoints: ['/chat/completions', '/completions', '/images/generations', '/audio/transcriptions', '/models'],
+                    description: 'שירותי בינה מלאכותית ומודלי שפה',
+                    exampleRequest: 'curl -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d \'{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"Hello!"}]}\' https://api.openai.com/v1/chat/completions',
+                    sdkAvailable: true,
+                    rateLimits: 'משתנה לפי תוכנית התשלום',
+                    pricingModel: 'תשלום לפי שימוש'
+                },
+                'api.anthropic.com': {
+                    serviceName: 'Anthropic Claude',
+                    hasAPI: true,
+                    apiType: 'REST',
+                    baseURL: 'https://api.anthropic.com/v1',
+                    documentationURL: 'https://docs.anthropic.com',
+                    requiresAuth: true,
+                    authType: 'API Key',
+                    keyEndpoints: ['/messages', '/models'],
+                    description: 'שירותי בינה מלאכותית ומודל Claude',
+                    exampleRequest: 'curl -H "x-api-key: YOUR_API_KEY" -H "Content-Type: application/json" -d \'{"model":"claude-3-sonnet-20240229","max_tokens":1000,"messages":[{"role":"user","content":"Hello"}]}\' https://api.anthropic.com/v1/messages',
+                    sdkAvailable: true,
+                    rateLimits: 'משתנה לפי תוכנית התשלום',
+                    pricingModel: 'תשלום לפי שימוש'
+                },
+                'jsonplaceholder.typicode.com': {
+                    serviceName: 'JSONPlaceholder',
+                    hasAPI: true,
+                    apiType: 'REST',
+                    baseURL: 'https://jsonplaceholder.typicode.com',
+                    documentationURL: 'https://jsonplaceholder.typicode.com',
+                    requiresAuth: false,
+                    authType: null,
+                    keyEndpoints: ['/posts', '/comments', '/albums', '/photos', '/todos', '/users'],
+                    description: 'API דמה לבדיקות ופרוטוטיפים',
+                    exampleRequest: 'curl https://jsonplaceholder.typicode.com/posts/1',
+                    sdkAvailable: false,
+                    rateLimits: 'ללא מגבלות',
+                    pricingModel: 'חינמי לחלוטין'
+                }
+            };
+
+            // בדיקה אם השירות ידוע
+            if (knownServices[domain]) {
+                return knownServices[domain];
+            }
+
+            // ניתוח כללי מבוסס על דומיין
+            let serviceName = domain.replace(/^(www\.|api\.)/, '').split('.')[0];
+            serviceName = serviceName.charAt(0).toUpperCase() + serviceName.slice(1);
+
+            // זיהוי סוג שירות לפי דומיין
+            let apiType = 'REST';
+            let hasAPI = true;
+            let requiresAuth = true;
+            let authType = 'API Key';
+            let baseURL = `https://api.${domain}`;
+            let documentationURL = `https://${domain}/docs`;
+            let description = `שירות מבוסס ${serviceName}`;
+            let keyEndpoints = ['/api/v1/data', '/api/v1/users', '/api/v1/search'];
+            let pricingModel = 'freemium';
+            let rateLimits = '1000 בקשות לשעה';
+            let sdkAvailable = false;
+
+            // התאמות מיוחדות לפי סוג דומיין
+            if (domain.includes('api.')) {
+                baseURL = `https://${domain}`;
+                description += ' - שירות API ייעודי';
+            } else if (domain.includes('github')) {
+                return knownServices['github.com'];
+            } else if (domain.includes('google')) {
+                serviceName = 'Google API';
+                baseURL = `https://www.googleapis.com`;
+                documentationURL = 'https://developers.google.com';
+                authType = 'OAuth 2.0';
+                keyEndpoints = ['/v1/search', '/v1/translate', '/v1/maps'];
+                description = 'שירותי Google API';
+                sdkAvailable = true;
+            } else if (domain.includes('facebook') || domain.includes('meta')) {
+                serviceName = 'Meta/Facebook API';
+                baseURL = 'https://graph.facebook.com';
+                documentationURL = 'https://developers.facebook.com';
+                authType = 'Access Token';
+                keyEndpoints = ['/me', '/posts', '/photos', '/friends'];
+                description = 'שירותי Meta ופייסבוק';
+                sdkAvailable = true;
+            } else if (domain.includes('twitter') || domain.includes('x.com')) {
+                serviceName = 'Twitter/X API';
+                baseURL = 'https://api.twitter.com/2';
+                documentationURL = 'https://developer.twitter.com';
+                authType = 'Bearer Token';
+                keyEndpoints = ['/tweets', '/users', '/spaces', '/lists'];
+                description = 'שירותי Twitter/X';
+                sdkAvailable = true;
+            } else if (domain.includes('stripe')) {
+                serviceName = 'Stripe';
+                baseURL = 'https://api.stripe.com/v1';
+                documentationURL = 'https://stripe.com/docs/api';
+                keyEndpoints = ['/charges', '/customers', '/subscriptions', '/invoices'];
+                description = 'שירותי תשלומים מקוונים';
+                pricingModel = 'תשלום לפי עמלות';
+                sdkAvailable = true;
+            } else if (domain.includes('weather')) {
+                serviceName = 'Weather API';
+                keyEndpoints = ['/current', '/forecast', '/history'];
+                description = 'שירותי מזג אוויר';
+            } else if (domain.includes('news')) {
+                serviceName = 'News API';
+                keyEndpoints = ['/headlines', '/everything', '/sources'];
+                description = 'שירותי חדשות';
+            }
+
+            // בדיקה אם זה אתר רגיל ללא API
+            if (domain.includes('wikipedia') || domain.includes('blog') || 
+                domain.includes('news') && !domain.includes('api')) {
+                hasAPI = false;
+                description += ' - אתר תוכן רגיל ללא API ציבורי';
+            }
+
+            return {
+                serviceName,
+                hasAPI,
+                apiType,
+                baseURL: hasAPI ? baseURL : null,
+                documentationURL: hasAPI ? documentationURL : null,
+                requiresAuth: hasAPI ? requiresAuth : false,
+                authType: hasAPI && requiresAuth ? authType : null,
+                keyEndpoints: hasAPI ? keyEndpoints : [],
+                description,
+                exampleRequest: hasAPI ? `curl -H "Authorization: Bearer YOUR_TOKEN" ${baseURL}${keyEndpoints[0] || '/api/v1/data'}` : null,
+                sdkAvailable,
+                rateLimits: hasAPI ? rateLimits : null,
+                pricingModel: hasAPI ? pricingModel : null
+            };
+        };
+
         const APIDetectorBot = () => {
             const [url, setUrl] = useState('');
             const [loading, setLoading] = useState(false);
@@ -146,83 +306,10 @@
                         console.log('לא ניתן לקרוא את האתר ישירות, ממשיך ללא תוכן');
                     }
                     
-                    // שלב 2: ניתוח עם Claude (מדמה ניתוח מקומי)
-                    const response = await fetch("https://cors-anywhere.herokuapp.com/https://api.anthropic.com/v1/messages", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": "Bearer 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"
-                        },
-                        body: JSON.stringify({
-                            model: "claude-sonnet-4-20250514",
-                            max_tokens: 1000,
-                            messages: [
-                                {
-                                    role: "user",
-                                    content: `נתח את האתר ${url} (domain: ${domain}) ותחזיר מידע על ה-API שלו.
-
-${websiteContent ? `תוכן רלוונטי מהאתר: ${websiteContent}` : 'לא ניתן לקרוא את תוכן האתר'}
-
-בהתבסס על שם הדומיין ותוכן האתר (אם קיים), נתח ותחזיר JSON עם השדות הבאים:
-- serviceName: שם השירות (בעברית אם אפשר)
-- hasAPI: האם כנראה יש API (true/false)  
-- apiType: סוג API סביר (REST/GraphQL/WebSocket/אחר)
-- baseURL: כתובת בסיס משוערת של ה-API (בדרך כלל api.${domain} או ${domain}/api)
-- documentationURL: קישור לדוקומנטציה משוער (בדרך כלל ${domain}/docs או ${domain}/developer)
-- requiresAuth: האם כנראה נדרש authentication (true/false)
-- authType: סוג authentication סביר (API Key/OAuth/JWT/Bearer Token)
-- keyEndpoints: רשימה של endpoints משוערים לפי סוג השירות (מקסימום 5)
-- description: תיאור של מה השירות כנראה עושה בהתבסס על הדומיין (בעברית)
-- exampleRequest: דוגמה לבקשה משוערת
-- sdkAvailable: האם כנראה יש SDK (true/false)
-- rateLimits: מגבלות שימוש טיפוסיות (בעברית)
-- pricingModel: מודל תמחור משוער (בעברית - חינמי/בתשלום/freemium)
-
-חשוב: התבסס על שמות דומיינים נפוצים ועל מידע שאתה יודע על שירותים דומים.
-
-החזר רק JSON תקין ללא שום markdown, backticks, או הסברים נוספים. התחל ישירות עם { וסיים עם }.`
-                                }
-                            ]
-                        })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`שגיאה ב-API: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    let apiInfo = data.content[0].text;
-                    
-                    // ניקוי JSON מ-markdown blocks
-                    apiInfo = apiInfo.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-                    
-                    try {
-                        const parsedResult = JSON.parse(apiInfo);
-                        setResult(parsedResult);
-                    } catch (parseError) {
-                        // אם הJSON לא תקין, ננסה לחלץ אותו מהטקסט
-                        const jsonMatch = apiInfo.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) {
-                            try {
-                                const extractedJson = JSON.parse(jsonMatch[0]);
-                                setResult(extractedJson);
-                            } catch (extractError) {
-                                setResult({
-                                    serviceName: domain,
-                                    description: apiInfo,
-                                    hasAPI: true,
-                                    error: 'לא ניתן לפרסר את התוצאה כ-JSON'
-                                });
-                            }
-                        } else {
-                            setResult({
-                                serviceName: domain,
-                                description: apiInfo,
-                                hasAPI: true,
-                                error: 'התוצאה התקבלה בפורמט טקסט'
-                            });
-                        }
-                    }
+                    // שלב 2: ניתוח מקומי מבוסס על כללים (במקום API חיצוני)
+                    // מכיוון שאין גישה ל-API של Claude, נשתמש בניתוח מקומי חכם
+                    const apiInfo = analyzeWebsiteLocally(url, domain, websiteContent);
+                    setResult(apiInfo);
                     
                 } catch (err) {
                     setError(`שגיאה: ${err.message}`);
