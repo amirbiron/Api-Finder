@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 // Model configuration
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
-console.log("📤 Claude model:", MODEL);
+console.log("📤 Claude model:", `[${MODEL}]`);
 
 app.use(cors());
 app.use(express.json());
@@ -140,8 +140,9 @@ JSON format:
         // \u05e0\u05d9\u05e7\u05d5\u05d9 JSON
         apiInfo = apiInfo.replace(/\`\`\`json\s*/g, '').replace(/\`\`\`\s*/g, '').trim();
         
+        let parsedResult;
         try {
-            const parsedResult = JSON.parse(apiInfo);
+            parsedResult = JSON.parse(apiInfo);
             
             if (domain === "api.openai.com") {
               const fixMethod = ep => {
@@ -199,10 +200,13 @@ JSON format:
                  parsedResult.sources = [documentationURL];
             }
             res.json(parsedResult);
-        } catch (parseError) {
-            console.error('JSON Parse Error:', parseError);
-            console.error('Raw response from Claude:', apiInfo);
-            res.status(502).json({error:"JSON_PARSE_ERROR", message:parseError.message, raw: apiInfo.slice(0,1500)});
+        } catch (e) {
+            console.error("JSON Parse Error:", e);
+            return res.status(502).json({
+                error: "JSON_PARSE_ERROR",
+                message: e.message,
+                raw: apiInfo.slice(0,1500)
+            });
         }
         
     } catch (error) {
