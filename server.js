@@ -9,15 +9,46 @@ const PORT = process.env.PORT || 3000;
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
 console.log("📤 Claude model:", `[${MODEL}]`);
 
-function normalizeEndpoints(list) {
+function normalizeEndpoints(list, baseURL = "") {
   if (!Array.isArray(list)) return [];
+  const base = (baseURL || "").replace(/\/$/, "");
+  const METHODS = ["GET","POST","PUT","DELETE","PATCH","HEAD","OPTIONS"];
+  const RE_ANY   = new RegExp(`\\b(${METHODS.join("|")})\\b`, "gi");
+  const RE_TIGHT = new RegExp(`(https?:\\/\\/[^\\s]+?)(${METHODS.join("|")})`, "i");
+
   return list
     .map(ep => {
       if (!ep) return null;
-      if (typeof ep === "string") return ep;
-      const m = (ep.method || "GET").toUpperCase();
-      const p = ep.path || "";
-      return `${m} ${p}`;
+
+      // כבר אובייקט?
+      if (typeof ep === "object") {
+        const m = (ep.method || "GET").toUpperCase();
+        let p = (ep.path || "").trim();
+        p = p.startsWith("/") ? p : "/" + p;
+        return `${m} ${p}`;
+      }
+
+      // מחרוזת
+      let s = ep.replace(/\s+/g, " ").trim();
+
+      // הפרדה אם דבוק: ...comPOST
+      s = s.replace(RE_TIGHT, "$1 $2");
+
+      // חילוץ method ראשון
+      const mMatch = s.match(RE_ANY);
+      const method = (mMatch ? mMatch[0] : "GET").toUpperCase();
+      s = s.replace(RE_ANY, "").trim();
+
+      // הסרת baseURL
+      if (base && s.startsWith(base)) s = s.slice(base.length);
+
+      // חילוץ pathname אם נשאר URL מלא
+      if (/^https?:\/\//i.test(s)) {
+        try { s = new URL(s).pathname; } catch (_) {}
+      }
+
+      const path = s.startsWith("/") ? s : "/" + s;
+      return `${method} ${path}`;
     })
     .filter(Boolean);
 }
@@ -165,7 +196,7 @@ JSON format:
         }
 
         // --- Normalize endpoints to strings ---
-        parsedResult.keyEndpoints = normalizeEndpoints(parsedResult.keyEndpoints);
+        parsedResult.keyEndpoints = normalizeEndpoints(parsedResult.keyEndpoints, parsedResult.baseURL || parsedResult.baseUrl || parsedResult.base_url || "");
             
             if (domain === "api.openai.com") {
               const fixMethod = ep => {
