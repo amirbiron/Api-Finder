@@ -3,16 +3,52 @@
 // DEBUG mode via URL: add ?debug=1
 const DEBUG = new URLSearchParams(location.search).has("debug");
 
-// ממיר כל endpoint למחרוזת "METHOD PATH"
-function normalizeEndpoints(list) {
-  if (!Array.isArray(list)) return [];
-  return list.map(ep => {
-    if (!ep) return null;
-    if (typeof ep === "string") return ep;
-    const m = (ep.method || "GET").toUpperCase();
-    const p = ep.path || "";
-    return `${m} ${p}`;
-  }).filter(Boolean);
+// מנקה אנדפוינטים ומסיר רווחים כפולים
+function cleanEndpoints(arr, baseURL = "") {
+  if (!Array.isArray(arr)) return [];
+  const base = (baseURL || "").replace(/\/$/, "");
+  return arr
+    .map(ep => {
+      if (!ep) return null;
+
+      // אם הגיע כאובייקט
+      if (typeof ep === "object") {
+        const method = (ep.method || "GET").toUpperCase();
+        let path = ep.path || "";
+        path = path.startsWith("/") ? path : "/" + path;
+        return { method, path };
+      }
+
+      // אם הגיע כמחרוזת
+      const cleaned = ep.replace(/\s+/g, " ").trim();          // מנקה רווחים כפולים
+      const parts = cleaned.split(" ");
+      const method = (parts.shift() || "GET").toUpperCase();
+      let path = parts.join(" ").trim();
+
+      // מסיר baseURL אם שובץ בפנים
+      if (path.startsWith(base)) path = path.slice(base.length);
+      path = path.startsWith("/") ? path : "/" + path;
+
+      return { method, path };
+    })
+    .filter(Boolean);
+}
+
+// רנדר רשימת אנדפוינטים
+function renderEndpoints(list, baseURL = "") {
+  if (!list || !list.length) return "";
+  const base = (baseURL || "").replace(/\/$/, "");
+  return `
+    <p><strong>Endpoints עיקריים:</strong></p>
+    <ul>
+      ${list
+        .map(({ method, path }) => {
+          const full = path.startsWith("http") ? path : base + path;
+          return `<li><span class="method">${method}</span> <a href="${full}" target="_blank">${full}</a></li>`;
+        })
+        .join("")}
+    </ul>
+  `;
 }
 
 // Elements (שנה IDs אם שונים אצלך)
@@ -61,7 +97,7 @@ async function analyze(url) {
     }
 
     // נרמול אנדפוינטים
-    data.keyEndpoints = normalizeEndpoints(data.keyEndpoints);
+    data.keyEndpoints = cleanEndpoints(data.keyEndpoints, data.baseURL);
 
     renderResult(data);
     if (DEBUG) debugBox(JSON.stringify(data, null, 2));
@@ -133,7 +169,7 @@ function renderResult(data) {
       ${data.requiresAuth !== undefined ? `<p><strong>נדרש אימות:</strong> ${data.requiresAuth ? "כן" : "לא"}</p>` : ""}
       ${data.authType ? `<p><strong>סוג אימות:</strong> ${escapeHtml(data.authType)}</p>` : ""}
 
-      ${renderEndpoints(data.keyEndpoints)}
+      ${renderEndpoints(data.keyEndpoints, data.baseURL)}
       ${data.description ? `<p><strong>תיאור:</strong> ${escapeHtml(data.description)}</p>` : ""}
 
       ${data.exampleRequest ? `
@@ -150,17 +186,6 @@ function renderResult(data) {
   `;
 
   resultEl.innerHTML = html;
-}
-
-// רנדר רשימת אנדפוינטים
-function renderEndpoints(list) {
-  if (!list || !list.length) return "";
-  return `
-    <p><strong>Endpoints עיקריים:</strong></p>
-    <ul>
-      ${list.map(ep => `<li>${escapeHtml(ep)}</li>`).join("")}
-    </ul>
-  `;
 }
 
 // מונע XSS פשוט
